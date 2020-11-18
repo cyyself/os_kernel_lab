@@ -3,7 +3,10 @@
 #include <stab.h>
 #include <stdio.h>
 #include <string.h>
+#include <sync.h>
 #include <kdebug.h>
+#include <kmonitor.h>
+#include <assert.h>
 
 #define STACKFRAME_DEPTH 20
 
