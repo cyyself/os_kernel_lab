@@ -363,18 +363,24 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
      *   PTE_W           0x002                   // page table/directory entry flags bit : Writeable
      *   PTE_U           0x004                   // page table/directory entry flags bit : User can access
      */
-#if 0
-    pde_t *pdep = NULL;   // (1) find page directory entry
-    if (0) {              // (2) check if entry is not present
-                          // (3) check if creating is needed, then alloc page for page table
-                          // CAUTION: this page is used for page table, not for common data page
-                          // (4) set page reference
-        uintptr_t pa = 0; // (5) get linear address of page
-                          // (6) clear page content using memset
-                          // (7) set page directory entry's permission
+    int pde_idx = PDX(la);
+    pde_t *pdep = pgdir + pde_idx;// (1) find page directory entry
+    if (((*pdep) & PTE_P) == 0) {// (2) check if entry is not present
+        //creaete page table
+        if (create) {// (3) check if creating is needed
+            struct Page *page_table = alloc_page();//then alloc page for page table
+            // CAUTION: this page is used for page table, not for common data page
+            if (page_table == NULL) return NULL;//if didn't will get panic
+            set_page_ref(page_table,1);// (4) set page reference
+            uintptr_t pa = page2pa(page_table);// (5) get linear address of page
+            //page2pa returns shifted 
+            memset(KADDR(pa),0,PGSIZE);// (6) clear page content using memset
+            *pdep = pa | PTE_P | PTE_W | PTE_U;//I don't think it's user can access but the answer from THU operate bitwise or PTE_U
+        }
+        else return NULL;//if didn't will get panic
+        //TODO: 但是页表不存在又不创建，为什么不能panic？检查defalt_pmm.c中的函数逻辑
     }
-    return NULL;          // (8) return page table entry
-#endif
+    return KADDR(PDE_ADDR(*pdep)+(PTX(la) << 2));// (8) return page table entry
 }
 
 //get_page - get related Page struct for linear address la using PDT pgdir
@@ -420,7 +426,6 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
                                   //(6) flush tlb
     }
 #endif
-
 }
 
 //page_remove - free an Page which is related linear address la and has an validated pte
