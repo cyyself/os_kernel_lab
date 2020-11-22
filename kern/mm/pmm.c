@@ -283,6 +283,27 @@ boot_alloc_page(void) {
     return page2kva(p);
 }
 
+//LAB2 exerice4: print physical memory layout
+void print_phy_memory_layout() {
+    extern char kern_init[],etext[],bootstacktop[],bootstack[],__boot_pt1[],end[];
+    cprintf("\n");
+    cprintf("----- LAB2 EXERCISE 4 Physical Memory BEGIN -----\n");
+    cprintf("|Name                  |Physical Address           |\n");
+    cprintf("|Bootloader stack      |0x%08x-0x%08x      |\n",0,0x7c00);//bootloader堆栈区域, ref: boot/bootasm.S:88
+    cprintf("|Bootloader code       |0x%08x                 |\n",0x7c00);//bootloader代码区域, ref: tools/boot.ld:5
+    cprintf("|Kernel code           |0x%08x                 |\n",PADDR(0xC0100000));//kernel 代码区域, ref: tools/kernel.ld:10
+    cprintf("|kern_init             |0x%08x                 |\n",PADDR(kern_init));//from extern
+    cprintf("|etext                 |0x%08x                 |\n",PADDR(etext));//from extern
+    cprintf("|Boot Stack            |0x%08x                 |\n",PADDR(bootstack));//from extern
+    cprintf("|Boot Stacktop         |0x%08x                 |\n",PADDR(bootstacktop));//from extern
+    cprintf("|Boot Page Directory   |0x%08x-0x%08x      |\n",PADDR(&__boot_pgdir),PADDR((void*)&__boot_pgdir+PGSIZE));//from extern, ref: kern/init/entry.S:59
+    cprintf("|(0-4M) Addr Page Table|0x%08x-0x%08x      |\n",PADDR(__boot_pt1),PADDR(__boot_pt1+PGSIZE));//from extern, ref: kern/init/entry.S:69
+    cprintf("|end                   |0x%08x                 |\n",PADDR(end));//from extern, ref: ref: tools/kernel.ld:58
+    cprintf("|pages array           |0x%08x-0x%08x      |\n",PADDR(pages),PADDR((uintptr_t)pages + sizeof(struct Page) * npage));//from page_init function
+    cprintf("|freedom pointer       |0x%08x                 |\n",PADDR((uintptr_t)pages + sizeof(struct Page) * npage));//from page_init function
+    cprintf("----- LAB2 EXERCISE 4 Physical Memory  END  -----\n\n");
+}
+
 //pmm_init - setup a pmm to manage physical memory, build PDT&PT to setup paging mechanism 
 //         - check the correctness of pmm & paging mechanism, print PDT&PT
 void
@@ -328,6 +349,7 @@ pmm_init(void) {
 
     print_pgdir();
 
+    print_phy_memory_layout();
 }
 
 //get_pte - get pte and return the kernel virtual address of this pte for la
