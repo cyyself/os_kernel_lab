@@ -297,7 +297,7 @@ void print_phy_memory_layout() {
     cprintf("|Boot Stack            |0x%08x                 |\n",PADDR(bootstack));//from extern
     cprintf("|Boot Stacktop         |0x%08x                 |\n",PADDR(bootstacktop));//from extern
     cprintf("|Boot Page Directory   |0x%08x-0x%08x      |\n",PADDR(&__boot_pgdir),PADDR((void*)&__boot_pgdir+PGSIZE));//from extern, ref: kern/init/entry.S:59
-    cprintf("|(0-4M) Addr Page Table|0x%08x-0x%08x      |\n",PADDR(__boot_pt1),PADDR(__boot_pt1+PGSIZE));//from extern, ref: kern/init/entry.S:69
+    cprintf("|(0-4M Addr) Page Table|0x%08x-0x%08x      |\n",PADDR(__boot_pt1),PADDR(__boot_pt1+PGSIZE));//from extern, ref: kern/init/entry.S:69
     cprintf("|end                   |0x%08x                 |\n",PADDR(end));//from extern, ref: ref: tools/kernel.ld:58
     cprintf("|pages array           |0x%08x-0x%08x      |\n",PADDR(pages),PADDR((uintptr_t)pages + sizeof(struct Page) * npage));//from page_init function
     cprintf("|freedom pointer       |0x%08x                 |\n",PADDR((uintptr_t)pages + sizeof(struct Page) * npage));//from page_init function
