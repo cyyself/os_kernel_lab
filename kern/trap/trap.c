@@ -41,7 +41,6 @@ static struct pseudodesc idt_pd = {
 /* idt_init - initialize IDT to each of the entry points in kern/trap/vectors.S */
 void
 idt_init(void) {
-     /* LAB1 YOUR CODE : STEP 2 */
      /* (1) Where are the entry addrs of each Interrupt Service Routine (ISR)?
       *     All ISR's entry addrs are stored in __vectors. where is uintptr_t __vectors[] ?
       *     __vectors[] is in kern/trap/vector.S which is produced by tools/vector.c
@@ -56,7 +55,9 @@ idt_init(void) {
      /* LAB3 YOUR CODE */ 
      //you should update your lab1 code (just add ONE or TWO lines of code), let user app to use syscall to get the service of ucore
      //so you should setup the syscall interrupt gate in here
-   
+    extern uintptr_t __vectors[];
+    for (int i=0;i<256;i++) SETGATE(idt[i],0,GD_KTEXT,__vectors[i],(i==T_SWITCH_TOK?DPL_USER:DPL_KERNEL));
+    lidt(&idt_pd);
 }
 
 static const char *
@@ -210,17 +211,13 @@ trap_dispatch(struct trapframe *tf) {
         syscall();
         break;
     case IRQ_OFFSET + IRQ_TIMER:
-        /* LAB1 YOUR CODE : STEP 3 */
-        /* handle the timer interrupt */
-        /* (1) After a timer interrupt, you should record this event using a global variable (increase it), such as ticks in kern/driver/clock.c
-         * (2) Every TICK_NUM cycle, you can print some info using a funciton, such as print_ticks().
-         * (3) Too Simple? Yes, I think so!
-         */
         /* LAB3 YOUR CODE */
         /* you should upate you lab1 code (just add ONE or TWO lines of code):
          *    Every TICK_NUM cycle, you should set current process's current->need_resched = 1
          */
-
+        ticks = (ticks + 1) % TICK_NUM;
+        if (ticks == 0) print_ticks();
+        break;
     case IRQ_OFFSET + IRQ_COM1:
         c = cons_getc();
         cprintf("serial [%03d] %c\n", c, c);
