@@ -284,6 +284,27 @@ boot_alloc_page(void) {
     return page2kva(p);
 }
 
+//LAB2 exerice4: print physical memory layout
+void print_phy_memory_layout() {
+    extern char kern_init[],etext[],bootstacktop[],bootstack[],__boot_pt1[],end[];
+    cprintf("\n");
+    cprintf("----- LAB2 EXERCISE 4 Physical Memory BEGIN -----\n");
+    cprintf("|Name                  |Physical Address           |\n");
+    cprintf("|Bootloader stack      |0x%08x-0x%08x      |\n",0,0x7c00);//bootloader堆栈区域, ref: boot/bootasm.S:88
+    cprintf("|Bootloader code       |0x%08x                 |\n",0x7c00);//bootloader代码区域, ref: tools/boot.ld:5
+    cprintf("|Kernel code           |0x%08x                 |\n",PADDR(0xC0100000));//kernel 代码区域, ref: tools/kernel.ld:10
+    cprintf("|kern_init             |0x%08x                 |\n",PADDR(kern_init));//from extern
+    cprintf("|etext                 |0x%08x                 |\n",PADDR(etext));//from extern
+    cprintf("|Boot Stack            |0x%08x                 |\n",PADDR(bootstack));//from extern
+    cprintf("|Boot Stacktop         |0x%08x                 |\n",PADDR(bootstacktop));//from extern
+    cprintf("|Boot Page Directory   |0x%08x-0x%08x      |\n",PADDR(&__boot_pgdir),PADDR((void*)&__boot_pgdir+PGSIZE));//from extern, ref: kern/init/entry.S:59
+    cprintf("|(0-4M Addr) Page Table|0x%08x-0x%08x      |\n",PADDR(__boot_pt1),PADDR(__boot_pt1+PGSIZE));//from extern, ref: kern/init/entry.S:69
+    cprintf("|end                   |0x%08x                 |\n",PADDR(end));//from extern, ref: ref: tools/kernel.ld:58
+    cprintf("|pages array           |0x%08x-0x%08x      |\n",PADDR(pages),PADDR((uintptr_t)pages + sizeof(struct Page) * npage));//from page_init function
+    cprintf("|freedom pointer       |0x%08x                 |\n",PADDR((uintptr_t)pages + sizeof(struct Page) * npage));//from page_init function
+    cprintf("----- LAB2 EXERCISE 4 Physical Memory  END  -----\n\n");
+}
+
 //pmm_init - setup a pmm to manage physical memory, build PDT&PT to setup paging mechanism 
 //         - check the correctness of pmm & paging mechanism, print PDT&PT
 void
@@ -331,6 +352,7 @@ pmm_init(void) {
     
     kmalloc_init();
 
+    print_phy_memory_layout();
 }
 
 //get_pte - get pte and return the kernel virtual address of this pte for la
@@ -363,19 +385,24 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
      *   PTE_W           0x002                   // page table/directory entry flags bit : Writeable
      *   PTE_U           0x004                   // page table/directory entry flags bit : User can access
      */
-#if 0
-    pde_t *pdep = NULL;   // (1) find page directory entry
-    if (0) {              // (2) check if entry is not present
-                          // (3) check if creating is needed, then alloc page for page table
-                          // CAUTION: this page is used for page table, not for common data page
-                          // (4) set page reference
-        uintptr_t pa = 0; // (5) get linear address of page
-                          // (6) clear page content using memset
-                          // (7) set page directory entry's permission
+    int pde_idx = PDX(la);
+    pde_t *pdep = pgdir + pde_idx;// (1) find page directory entry
+    if (((*pdep) & PTE_P) == 0) {// (2) check if entry is not present
+        //creaete page table
+        if (create) {// (3) check if creating is needed
+            struct Page *page_table = alloc_page();//then alloc page for page table
+            // CAUTION: this page is used for page table, not for common data page
+            if (page_table == NULL) return NULL;//if didn't will get panic
+            set_page_ref(page_table,1);// (4) set page reference
+            uintptr_t pa = page2pa(page_table);// (5) get linear address of page
+            //page2pa returns shifted 
+            memset(KADDR(pa),0,PGSIZE);// (6) clear page content using memset
+            *pdep = pa | PTE_P | PTE_W | PTE_U;//I don't think it's user can access but the answer from THU operate bitwise or PTE_U
+        }
+        else return NULL;//if didn't will get panic
+        //TODO: 但是页表不存在又不创建，为什么不能panic？检查defalt_pmm.c中的函数逻辑
     }
-    return NULL;          // (8) return page table entry
-#endif
-  
+    return KADDR(PDE_ADDR(*pdep)+(PTX(la) << 2));// (8) return page table entry
 }
 
 //get_page - get related Page struct for linear address la using PDT pgdir
@@ -412,16 +439,13 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
      * DEFINEs:
      *   PTE_P           0x001                   // page table/directory entry flags bit : Present
      */
-#if 0
-    if (0) {                      //(1) check if page directory is present
-        struct Page *page = NULL; //(2) find corresponding page to pte
-                                  //(3) decrease page reference
-                                  //(4) and free this page when page reference reachs 0
-                                  //(5) clear second page table entry
-                                  //(6) flush tlb
+    if ((*ptep) & PTE_P) {//(1) check if page directory is present
+        struct Page *page = pte2page(*ptep);//(2) find corresponding page to pte
+        int page_ref = page_ref_dec(page);//(3) decrease page reference
+        if (page_ref == 0) free_page(page);//(4) and free this page when page reference reachs 0
+        *ptep = 0;//(5) clear second page table entry
+        tlb_invalidate(pgdir,la);//(6) flush tlb
     }
-#endif
-
 }
 
 void
@@ -503,7 +527,13 @@ copy_range(pde_t *to, pde_t *from, uintptr_t start, uintptr_t end, bool share) {
          * (3) memory copy from src_kvaddr to dst_kvaddr, size is PGSIZE
          * (4) build the map of phy addr of  nage with the linear addr start
          */
-     
+        //助教发的包忘记删答案了，看来这题不用做了
+        void * kva_src = page2kva(page);
+        void * kva_dst = page2kva(npage);
+    
+        memcpy(kva_dst, kva_src, PGSIZE);
+
+        ret = page_insert(to, npage, start, perm);
         assert(ret == 0);
         }
         start += PGSIZE;
