@@ -745,7 +745,7 @@ load_icode(int fd, int argc, char **kargv) {
      */
     tf->tf_cs = USER_CS;
     tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
-    tf->tf_esp = USTACKTOP;
+    tf->tf_esp = stacktop;
     tf->tf_eip = elf->e_entry;
     tf->tf_eflags = FL_IF;
     ret = 0;
