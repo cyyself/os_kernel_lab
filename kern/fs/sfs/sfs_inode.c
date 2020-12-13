@@ -599,35 +599,31 @@ sfs_io_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, void *buf, off_t offset
      * (3) If end position isn't aligned with the last block, Rd/Wr some content from begin to the (endpos % SFS_BLKSIZE) of the last block
 	 *       NOTICE: useful function: sfs_bmap_load_nolock, sfs_buf_op	
 	*/
+#define my_sfs_buf_op(_blkno,_offset,_sz) { \
+        if (!ret) ret = sfs_bmap_load_nolock(sfs,sin,_blkno,&ino); \
+        if (!ret) ret = sfs_buf_op(sfs,buf,_sz,ino,_offset); \
+        buf += _sz; \
+}
+
+#define my_sfs_blk_op(_blkno) { \
+        if (!ret) ret = sfs_bmap_load_nolock(sfs,sin,_blkno,&ino); \
+        if (!ret) ret = sfs_block_op(sfs,buf,ino,1); \
+        buf += SFS_BLKSIZE; \
+}
     if (nblks == 0) {
         //起点和终点在一个块，需要小心重复读写的问题
-        size_t sz = endpos - offset;
-        if (!ret) ret = sfs_bmap_load_nolock(sfs,sin,blkno,&ino);
-        if (!ret) ret = sfs_buf_op(sfs,buf,sz,ino,offset % SFS_BLKSIZE);
-        if (!ret) alen += sz;
+        my_sfs_buf_op(blkno,offset % SFS_BLKSIZE,endpos - offset);
     }
     else {
         off_t mid_l = ROUNDUP(offset,SFS_BLKSIZE), mid_r = ROUNDDOWN(endpos,SFS_BLKSIZE);
         //l
-        if (mid_l > offset) {
-            size_t sz = mid_l - offset;
-            if (!ret) ret = sfs_bmap_load_nolock(sfs,sin,blkno,&ino);
-            if (!ret) ret = sfs_buf_op(sfs,buf,sz,ino,offset % SFS_BLKSIZE);
-            buf += sz;
-        }
+        if (mid_l > offset) my_sfs_buf_op(blkno,offset % SFS_BLKSIZE,mid_l - offset);
         //mid
         for (off_t midoff=mid_l;midoff<mid_r && !ret;midoff+=SFS_BLKSIZE,buf += SFS_BLKSIZE) {
-            blkno = midoff / SFS_BLKSIZE;
-            if (!ret) ret = sfs_bmap_load_nolock(sfs,sin,blkno,&ino);
-            if (!ret) ret = sfs_block_op(sfs,buf,ino,1);
+            my_sfs_blk_op(midoff / SFS_BLKSIZE);
         }
         //r
-        if (mid_r <= endpos && !ret) {
-            blkno = endpos / SFS_BLKSIZE;
-            size_t sz = endpos - (mid_r-1);
-            if (!ret) ret = sfs_bmap_load_nolock(sfs,sin,blkno,&ino);
-            if (!ret) ret = sfs_buf_op(sfs,buf,sz,ino,0);
-        }
+        if (mid_r <= endpos && !ret) my_sfs_buf_op(endpos / SFS_BLKSIZE,0,endpos - (mid_r-1));
     }
     alen = endpos - offset;
 out:
