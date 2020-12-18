@@ -288,21 +288,37 @@ boot_alloc_page(void) {
 void print_phy_memory_layout() {
     extern char kern_init[],etext[],bootstacktop[],bootstack[],__boot_pt1[],end[];
     cprintf("\n");
-    cprintf("----- LAB2 EXERCISE 4 Physical Memory BEGIN -----\n");
-    cprintf("|Name                  |Physical Address           |\n");
-    cprintf("|Bootloader stack      |0x%08x-0x%08x      |\n",0,0x7c00);//bootloader堆栈区域, ref: boot/bootasm.S:88
-    cprintf("|Bootloader code       |0x%08x                 |\n",0x7c00);//bootloader代码区域, ref: tools/boot.ld:5
-    cprintf("|Kernel code           |0x%08x                 |\n",PADDR(0xC0100000));//kernel 代码区域, ref: tools/kernel.ld:10
-    cprintf("|kern_init             |0x%08x                 |\n",PADDR(kern_init));//from extern
-    cprintf("|etext                 |0x%08x                 |\n",PADDR(etext));//from extern
-    cprintf("|Boot Stack            |0x%08x                 |\n",PADDR(bootstack));//from extern
-    cprintf("|Boot Stacktop         |0x%08x                 |\n",PADDR(bootstacktop));//from extern
-    cprintf("|Boot Page Directory   |0x%08x-0x%08x      |\n",PADDR(&__boot_pgdir),PADDR((void*)&__boot_pgdir+PGSIZE));//from extern, ref: kern/init/entry.S:59
-    cprintf("|(0-4M Addr) Page Table|0x%08x-0x%08x      |\n",PADDR(__boot_pt1),PADDR(__boot_pt1+PGSIZE));//from extern, ref: kern/init/entry.S:69
-    cprintf("|end                   |0x%08x                 |\n",PADDR(end));//from extern, ref: ref: tools/kernel.ld:58
-    cprintf("|pages array           |0x%08x-0x%08x      |\n",PADDR(pages),PADDR((uintptr_t)pages + sizeof(struct Page) * npage));//from page_init function
-    cprintf("|freedom pointer       |0x%08x                 |\n",PADDR((uintptr_t)pages + sizeof(struct Page) * npage));//from page_init function
-    cprintf("----- LAB2 EXERCISE 4 Physical Memory  END  -----\n\n");
+    cprintf("+-- LAB2 EXERCISE 4 Physical Memory BEGIN ---+\n");
+    cprintf("|Name                  |Physical Address     |\n");
+    cprintf("|Bootloader stack      |0x%08x-0x%08x|\n",0,0x7c00);
+    //bootloader堆栈区域, ref: boot/bootasm.S:88
+    cprintf("|Bootloader code       |0x%08x           |\n",0x7c00);
+    //bootloader代码区域, ref: tools/boot.ld:5
+    cprintf("|Kernel code           |0x%08x           |\n",PADDR(0xC0100000));
+    //kernel 代码区域, ref: tools/kernel.ld:10
+    cprintf("|kern_init             |0x%08x           |\n",PADDR(kern_init));
+    //from extern
+    cprintf("|etext                 |0x%08x           |\n",PADDR(etext));
+    //from extern
+    cprintf("|Boot Stack            |0x%08x           |\n",PADDR(bootstack));
+    //from extern
+    cprintf("|Boot Stacktop         |0x%08x           |\n",PADDR(bootstacktop));
+    //from extern
+    cprintf("|Boot Page Directory   |0x%08x-0x%08x|\n",
+        PADDR(&__boot_pgdir),PADDR((void*)&__boot_pgdir+PGSIZE));
+    //from extern, ref: kern/init/entry.S:59
+    cprintf("|(0-4M Addr) Page Table|0x%08x-0x%08x|\n",
+        PADDR(__boot_pt1),PADDR(__boot_pt1+PGSIZE));
+    //from extern, ref: kern/init/entry.S:69
+    cprintf("|end                   |0x%08x           |\n",PADDR(end));
+    //from extern, ref: ref: tools/kernel.ld:58
+    cprintf("|pages array           |0x%08x-0x%08x|\n",
+        PADDR(pages),PADDR((uintptr_t)pages + sizeof(struct Page) * npage));
+    //from page_init function
+    cprintf("|freedom pointer       |0x%08x           |\n",
+        PADDR((uintptr_t)pages + sizeof(struct Page) * npage));
+    //from page_init function
+    cprintf("+-- LAB2 EXERCISE 4 Physical Memory  END  ---+\n\n");
 }
 
 //pmm_init - setup a pmm to manage physical memory, build PDT&PT to setup paging mechanism 
@@ -397,10 +413,9 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
             uintptr_t pa = page2pa(page_table);// (5) get linear address of page
             //page2pa returns shifted 
             memset(KADDR(pa),0,PGSIZE);// (6) clear page content using memset
-            *pdep = pa | PTE_P | PTE_W | PTE_U;//I don't think it's user can access but the answer from THU operate bitwise or PTE_U
+            *pdep = pa | PTE_P | PTE_W | PTE_U;
         }
         else return NULL;//if didn't will get panic
-        //TODO: 但是页表不存在又不创建，为什么不能panic？检查defalt_pmm.c中的函数逻辑
     }
     return KADDR(PDE_ADDR(*pdep)+(PTX(la) << 2));// (8) return page table entry
 }
